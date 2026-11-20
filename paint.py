@@ -9,13 +9,16 @@ news, and a sources line. Everything is drawn with Pillow shapes and
 system typefaces; the program takes no input from the network, the clock
 or any random source, so running it twice gives the same bytes.
 
-It saves entry.png beside itself, mirrors it into the directory named by
-MAKEFUN_OUTPUT_DIR (or /output), checks the mirror matches byte for
-byte, prints the size and digest, and refuses to finish when the file
-would pass one mebibyte.
+It saves entry.png into the directory named by
+MAKEFUN_OUTPUT_DIR (or /output), never into the program's own folder:
+the grader runs the program from a read-only directory, so writing
+beside the script fails there. It also tries, best effort, to mirror
+the file beside itself for local runs, ignoring a read-only folder.
+It checks the written file matches byte for byte, prints the size and
+digest, and refuses to finish when the file would pass one mebibyte.
 """
 
-import hashlib, json, os, shutil, sys
+import hashlib, io, json, os, sys
 
 from PIL import Image
 from PIL import ImageDraw
@@ -746,14 +749,23 @@ def run():
     with open(os.path.join(here, "stories.json"), encoding="utf-8") as fh:
         data = json.load(fh)
     img = compose(data)
-    local = os.path.join(here, "entry.png")
-    img.save(local, format="PNG", optimize=True)
+    # Encode once in memory, then write only to the output directory.
+    # Writing beside the script crashes when the program folder is
+    # read-only (the grader runs from /bot read-only), so the local
+    # mirror below is best effort and any failure there is ignored.
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    raw = buf.getvalue()
     outdir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(outdir, exist_ok=True)
     dest = os.path.join(outdir, "entry.png")
-    shutil.copyfile(local, dest)
-    with open(local, "rb") as fh:
-        raw = fh.read()
+    with open(dest, "wb") as fh:
+        fh.write(raw)
+    try:
+        with open(os.path.join(here, "entry.png"), "wb") as fh:
+            fh.write(raw)
+    except OSError:
+        pass
     with open(dest, "rb") as fh:
         twin = fh.read()
     if raw != twin:
