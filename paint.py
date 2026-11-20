@@ -38,7 +38,7 @@ SAND = (228,211,168)
 PANEL = (255,252,244)
 BORDER = (90,80,64)
 
-TYPE_DIR = "/usr/share/fonts/truetype/dejavu"
+TYPE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
 
 
 def open_faces():
